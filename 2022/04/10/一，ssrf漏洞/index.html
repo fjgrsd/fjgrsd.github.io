@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="description" content="许多web应用提供了向其它服务器获取数据的功能，根据指定的url，web应用可以下载文件，获取图片等。如果这种功能没有做好防御手段，就容易被攻击者恶意利用。这种形式的攻击被称为服务端请求伪造攻击（Server-side Request Forgery，SSRF） 漏洞发现社交分享功能：获取超链接的标题等内容进行显示 转码服务：通过URL地址把原地址的网页内容调优使其适合手机屏幕浏览 在线翻译：给网">
+<meta property="og:type" content="article">
+<meta property="og:title" content="一，ssrf漏洞">
+<meta property="og:url" content="http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="许多web应用提供了向其它服务器获取数据的功能，根据指定的url，web应用可以下载文件，获取图片等。如果这种功能没有做好防御手段，就容易被攻击者恶意利用。这种形式的攻击被称为服务端请求伪造攻击（Server-side Request Forgery，SSRF） 漏洞发现社交分享功能：获取超链接的标题等内容进行显示 转码服务：通过URL地址把原地址的网页内容调优使其适合手机屏幕浏览 在线翻译：给网">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2022-04-10T13:26:34.000Z">
+<meta property="article:modified_time" content="2022-04-10T13:35:13.270Z">
+<meta property="article:author" content="John Doe">
+<meta name="twitter:card" content="summary">
+    
+    
+      
+        
+          <link rel="shortcut icon" href="/images/favicon.ico">
+        
+      
+      
+        
+          <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+        
+      
+      
+        
+          <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+        
+      
+    
+    <!-- title -->
+    <title>一，ssrf漏洞</title>
+    <!-- styles -->
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    <!-- persian styles -->
+    
+    <!-- rss -->
+    
+    
+	<!-- mathjax -->
+	
+<meta name="generator" content="Hexo 6.1.0"></head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" aria-label="Top" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     --><!--
+       --><li><a target="_blank" rel="noopener" href="http://github.com/probberechts">Projects</a></li><!--
+     -->
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" aria-label="Previous post" href="/2022/04/10/Hello-World/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" aria-label="Next post" href="/2022/04/10/%E4%B8%83%EF%BC%8CRCE/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" aria-label="Back to top" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" aria-label="Share post" href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&text=一，ssrf漏洞"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&title=一，ssrf漏洞"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&is_video=false&description=一，ssrf漏洞"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=一，ssrf漏洞&body=Check out this article: http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&title=一，ssrf漏洞"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&title=一，ssrf漏洞"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&title=一，ssrf漏洞"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&title=一，ssrf漏洞"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&name=一，ssrf漏洞&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&t=一，ssrf漏洞"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%8F%91%E7%8E%B0"><span class="toc-number">1.</span> <span class="toc-text">漏洞发现</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%88%A4%E6%96%AD"><span class="toc-number">2.</span> <span class="toc-text">漏洞判断</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8"><span class="toc-number">3.</span> <span class="toc-text">漏洞利用</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BC%AA%E5%8D%8F%E8%AE%AE"><span class="toc-number">3.1.</span> <span class="toc-text">伪协议</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96-%E4%B8%8A%E4%BC%A0"><span class="toc-number">3.2.</span> <span class="toc-text">文件读取,上传</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%86%85%E7%BD%91%E6%8E%A2%E6%B5%8B%E4%B8%8E%E6%94%BB%E5%87%BB%EF%BC%9A"><span class="toc-number">3.3.</span> <span class="toc-text">内网探测与攻击：</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#DOS%E6%94%BB%E5%87%BB"><span class="toc-number">3.4.</span> <span class="toc-text">DOS攻击</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E7%BB%95%E8%BF%87"><span class="toc-number">4.</span> <span class="toc-text">漏洞绕过</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E9%98%B2%E5%BE%A1"><span class="toc-number">5.</span> <span class="toc-text">漏洞防御</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        一，ssrf漏洞
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">John Doe</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2022-04-10T13:26:34.000Z" itemprop="datePublished">2022-04-10</time>
+        
+      
+    </div>
+
+
+      
+
+      
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <p>许多web应用提供了向其它服务器获取数据的功能，根据指定的url，web应用可以下载文件，获取图片等。如果这种功能没有做好防御手段，就容易被攻击者恶意利用。这种形式的攻击被称为服务端请求伪造攻击（Server-side Request Forgery，SSRF）</p>
+<h2 id="漏洞发现"><a href="#漏洞发现" class="headerlink" title="漏洞发现"></a>漏洞发现</h2><p><strong>社交分享功能</strong>：获取超链接的标题等内容进行显示</p>
+<p><strong>转码服务</strong>：通过URL地址把原地址的网页内容调优使其适合手机屏幕浏览</p>
+<p><strong>在线翻译</strong>：给网址翻译对应网页的内容</p>
+<p><strong>图片加载&#x2F;下载</strong>：例如富文本编辑器中的点击下载图片到本地；通过URL地址加载或下载图片</p>
+<p><strong>图片&#x2F;文章收藏功能</strong>：主要其会取URL地址中title以及文本的内容作为显示以求一个好的用具体验</p>
+<p><strong>云服务厂商</strong>：它会远程执行一些命令来判断网站是否存活等，所以如果可以捕获相应的信息，就可以进行ssrf测试</p>
+<p><strong>网站采集，网站抓取的地方</strong>：一些网站会针对你输入的url进行一些信息采集工作</p>
+<p><strong>数据库内置功能</strong>：数据库的比如mongodb的copyDatabase函数</p>
+<p><strong>邮件系统</strong>：比如接收邮件服务器地址</p>
+<p><strong>编码处理, 属性信息处理，文件处理</strong>：比如ffpmg，ImageMagick，docx，pdf，xml处理器等</p>
+<p><strong>未公开的api实现以及其他扩展调用URL的功能</strong>：可以利用google 语法加上这些关键字去寻找SSRF漏洞</p>
+<p><strong>一些的url中的关键字</strong>：share、wap、url、link、src、source、target、u、3g、display、sourceURl、imageURL、domain……</p>
+<p><strong>从远程服务器请求资源</strong>（upload from url 如discuz！；import &amp; expost rss feed 如web blog；使用了xml引擎对象的地方 如wordpress xmlrpc.php）</p>
+<p><strong>源码里的一些函数</strong></p>
+<p>Php：file_get_contents，fsockopen，curl_exec</p>
+<p>Java：HttpURLConnection.getInputStream()，URLConnection.getInputStream()，Request.Get.execute()，Request.Post.execute()，URL.openStream()，ImageIO.read()，OkHttpClient.newCall.execute()，HttpClents.execute()，HttpClent.execute()</p>
+<h2 id="漏洞判断"><a href="#漏洞判断" class="headerlink" title="漏洞判断"></a>漏洞判断</h2><p>1.基本判断（排除法）<br>如：<a target="_blank" rel="noopener" href="http://www.douban.com/***/service?image=http://www.baidu.com/img/bd_logo1.png">http://www.douban.com/***/service?image=http://www.baidu.com/img/bd_logo1.png</a><br>排除法一：直接右键图片，在新窗口打开图片，如果是浏览器上URL地址栏是<a target="_blank" rel="noopener" href="http://www.baidu.com/img/bd_logo1.png%EF%BC%8C%E8%AF%B4%E6%98%8E%E4%B8%8D%E5%AD%98%E5%9C%A8SSRF%E6%BC%8F%E6%B4%9E%E3%80%82">http://www.baidu.com/img/bd_logo1.png，说明不存在SSRF漏洞。</a><br>排除法二：使用burpsuite等抓包工具来判断是否不是SSRF，首先SSRF是由服务端发起的请求，因此在加载图片的时候，是由服务端发起的，所以在我们本地浏览器的请求中就不应该存在图片的请求，如果刷新当前页面，有如下请求，则可判断不是SSRF。（前提设置burpsuite截断图片的请求，默认是放行的）</p>
+<p>2.DNSLog 服务</p>
+<p>生成一个域名（<a target="_blank" rel="noopener" href="http://l08bgh.dnslog.cn)用于伪造请求,看漏洞服务器(ip)是否发起/">http://l08bgh.dnslog.cn）用于伪造请求，看漏洞服务器(ip)是否发起</a> DNS 解析请求，若成功访问在 <a target="_blank" rel="noopener" href="http://dnslog.cn/">http://DNSLog.cn</a> 上就会有解析日志。</p>
+<h2 id="漏洞利用"><a href="#漏洞利用" class="headerlink" title="漏洞利用"></a>漏洞利用</h2><h3 id="伪协议"><a href="#伪协议" class="headerlink" title="伪协议"></a><strong>伪协议</strong></h3><p>php ssrf中的伪协议：<br> file;dict;sftp;ldap;tftp;gopher;http</p>
+<p> Java ssrf 中的伪协议：<br> file;ftp;mailto;http;https;jar;netdoc;gopher</p>
+<p>file:&#x2F;&#x2F;&#x2F;协议：从本地文件系统中获取文件</p>
+<p>dict:&#x2F;&#x2F;协议：一个字典服务器协议，默认使用端口 2628</p>
+<p>gopher:&#x2F;协议：一种通信协议，旨在在Internet协议网络中分发，搜索和检索文档。默认使用端口70。</p>
+<p>sftp:&#x2F;&#x2F;协议：SSH文件传输协议（SSH File Transfer Protocol）</p>
+<p>tftp:&#x2F;&#x2F;协议：进行简单文件传输的协议，使用69端口</p>
+<p>ldap:&#x2F;&#x2F;, ldaps:&#x2F;&#x2F;, ldapi:&#x2F;&#x2F;协议：轻型目录访问协议</p>
+<p>mailto：<strong>mailto</strong>是电子邮件地址的统一资源标识符(URI) 方案。它用于在网站上生成超链接，允许用户直接从HTML文档向特定地址发送电子邮件，而无需将其复制并输入电子邮件客户端。</p>
+<p>jar：Jar包中资源文件的路径表示</p>
+<p>netdoc:&#x2F;&#x2F;协议：在大部分情况下可代替file</p>
+<h3 id="文件读取-上传"><a href="#文件读取-上传" class="headerlink" title="文件读取,上传"></a>文件读取,上传</h3><p>读取：file:&#x2F;&#x2F;&#x2F;+绝对地址</p>
+<p>上传：gopher:&#x2F;&#x2F;+目标地址&#x2F;+处理后的上传文件数据包</p>
+<h3 id="内网探测与攻击："><a href="#内网探测与攻击：" class="headerlink" title="内网探测与攻击："></a><strong>内网探测与攻击：</strong></h3><p>端口扫描：利用bp</p>
+<p>后台登录：绕过限制登录</p>
+<p>FastCGI协议攻击</p>
+<p>Redis协议攻击</p>
+<h3 id="DOS攻击"><a href="#DOS攻击" class="headerlink" title="DOS攻击"></a><strong>DOS攻击</strong></h3><p>内网服务器带宽通常较小，通过ssrf漏洞向内网服务器发送大量请求较易使其瘫痪</p>
+<h2 id="漏洞绕过"><a href="#漏洞绕过" class="headerlink" title="漏洞绕过"></a>漏洞绕过</h2><p>使用替代 IP 表示127.0.0.1，例如2130706433、017700000001或127.1</p>
+<p>Url编码</p>
+<p>大小写变体混淆ⓔⓧⓐⓜⓟⓛⓔ.ⓒⓞⓜ</p>
+<p>短网址绕过</p>
+<p>重定向跳转</p>
+<p>#，@绕过</p>
+<p>特殊网址xip.io，nip.io，sslip.io</p>
+<p>添加端口号</p>
+<p>DNS解析</p>
+<h2 id="漏洞防御"><a href="#漏洞防御" class="headerlink" title="漏洞防御"></a>漏洞防御</h2><p>过滤返回信息</p>
+<p>禁用不需要的协议</p>
+<p>限制请求端口和内网ip</p>
+<p>设置黑白名单</p>
+<p>统一返回的错误信息</p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a target="_blank" rel="noopener" href="http://github.com/probberechts">Projects</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%8F%91%E7%8E%B0"><span class="toc-number">1.</span> <span class="toc-text">漏洞发现</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%88%A4%E6%96%AD"><span class="toc-number">2.</span> <span class="toc-text">漏洞判断</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8"><span class="toc-number">3.</span> <span class="toc-text">漏洞利用</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BC%AA%E5%8D%8F%E8%AE%AE"><span class="toc-number">3.1.</span> <span class="toc-text">伪协议</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96-%E4%B8%8A%E4%BC%A0"><span class="toc-number">3.2.</span> <span class="toc-text">文件读取,上传</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%86%85%E7%BD%91%E6%8E%A2%E6%B5%8B%E4%B8%8E%E6%94%BB%E5%87%BB%EF%BC%9A"><span class="toc-number">3.3.</span> <span class="toc-text">内网探测与攻击：</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#DOS%E6%94%BB%E5%87%BB"><span class="toc-number">3.4.</span> <span class="toc-text">DOS攻击</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E7%BB%95%E8%BF%87"><span class="toc-number">4.</span> <span class="toc-text">漏洞绕过</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%BC%8F%E6%B4%9E%E9%98%B2%E5%BE%A1"><span class="toc-number">5.</span> <span class="toc-text">漏洞防御</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&text=一，ssrf漏洞"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&title=一，ssrf漏洞"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&is_video=false&description=一，ssrf漏洞"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=一，ssrf漏洞&body=Check out this article: http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&title=一，ssrf漏洞"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&title=一，ssrf漏洞"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&title=一，ssrf漏洞"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&title=一，ssrf漏洞"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&name=一，ssrf漏洞&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://47.105.33.240/2022/04/10/%E4%B8%80%EF%BC%8Cssrf%E6%BC%8F%E6%B4%9E/&t=一，ssrf漏洞"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy;
+    
+    
+    2016-2022
+    John Doe
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     --><!--
+       --><li><a target="_blank" rel="noopener" href="http://github.com/probberechts">Projects</a></li><!--
+     -->
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+
+
+
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'"/>
+
+
+    <!-- jquery -->
+ 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script> 
+
+
+
+
+<!-- clipboard -->
+
+  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.7/clipboard.min.js" crossorigin="anonymous"></script> 
+  
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight table").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      text: function(trigger) {
+        return Array.from(trigger.nextElementSibling.querySelectorAll('.code')).reduce((str,it)=>str+it.innerText+'\n','')
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+
+<script src="/js/main.js"></script>
+
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Cloudflare Analytics -->
+
+<!-- Umami Analytics -->
+
+<!-- Disqus Comments -->
+
+<!-- utterances Comments -->
+
+</body>
+</html>
